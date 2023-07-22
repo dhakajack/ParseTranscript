@@ -1,0 +1,78 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use File::Basename;
+use File::Path qw(make_path);
+
+# Check if the input and output directory paths are provided
+unless (@ARGV == 2) {
+    die "Usage: $0 <input_directory> <output_directory>\n";
+}
+
+# Get the input and output directory paths from the command line arguments
+my ($input_directory, $output_directory) = @ARGV;
+
+# Create the output directory if it doesn't exist
+make_path($output_directory) unless (-d $output_directory);
+
+# Open the input directory for reading
+opendir(my $input_fh, $input_directory) or die "Cannot open $input_directory: $!\n";
+
+# Process each file in the input directory
+while (my $file = readdir($input_fh)) {
+    next if ($file eq '.' || $file eq '..');
+    my $input_file = "$input_directory/$file";
+
+    # Skip directories and non-text files
+    next if (-d $input_file || !-T $input_file);
+
+    # Initialize an array to store the lines that will be written to output
+    my @lines_to_write;
+
+    # Initialize a variable to store the most recent non-duplicate line
+    my $most_recent_line;
+
+    # Open the input file for reading
+    open(my $input_file_fh, '<', $input_file) or die "Cannot open $input_file: $!\n";
+
+    # Process each line in the input file
+    while (my $line = <$input_file_fh>) {
+        # Remove leading and trailing whitespace from the line
+        $line =~ s/^\s+|\s+$//g;
+
+        # Ignore lines that do not begin and end with a letter
+        next unless $line =~ /^[a-zA-Z].*[a-zA-Z]$/;
+
+        # Ignore lines that are duplicates of the most recent non-duplicate line
+        next if defined $most_recent_line && $line eq $most_recent_line;
+
+        # Store the line in the array of lines to write
+        push @lines_to_write, $line;
+
+        # Update the most recent non-duplicate line
+        $most_recent_line = $line;
+    }
+
+    # Close the input file
+    close $input_file_fh;
+
+    # Create the output file name in the output directory
+    my $output_file = "$output_directory/" . basename($input_file) . "_output";
+
+    # Open the output file for writing
+    open(my $output_fh, '>', $output_file) or die "Cannot create $output_file: $!\n";
+
+    # Write the lines that need to be written to output (after the first four lines)
+    if (@lines_to_write > 4) {
+        print $output_fh join(' ', @lines_to_write[4..$#lines_to_write]);
+    }
+
+    # Close the output file
+    close $output_fh;
+
+    print "Processing completed. Output written to $output_file.\n";
+}
+
+# Close the input directory
+closedir $input_fh;
+
